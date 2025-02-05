@@ -21,33 +21,39 @@ export function AnagramSolver() {
   const [input, setInput] = useState('');
   const [results, setResults] = useState([]);
 
+  const [debug, setDebug] = useState(null);
+
   const handleInputChange = async (e) => {
     const value = e.target.value;
     setInput(value);
     
-    // Test data for development
     if (value.length > 0) {
-      // Simulate API response with test data
-      setTimeout(() => {
-        if (value === 'שלום') {
-          setResults([
-            ['של', 'לום'],
-            ['שלום'],
-            ['לש', 'ום']
-          ]);
-        } else if (value === 'אבג') {
-          setResults([
-            ['אב', 'ג'],
-            ['א', 'בג']
-          ]);
+      try {
+        const response = await fetch('http://localhost:3000/api/anagram', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ text: value }),
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setResults(data.results);
+          setDebug(data.debug);
         } else {
-          setResults([
-            [value + ' (test)']
-          ]);
+          console.error('Error fetching anagrams:', response.statusText);
+          setResults([]);
+          setDebug(null);
         }
-      }, 300); // Simulate network delay
+      } catch (error) {
+        console.error('Error fetching anagrams:', error);
+        setResults([]);
+        setDebug(null);
+      }
     } else {
       setResults([]);
+      setDebug(null);
     }
   };
 
@@ -104,6 +110,29 @@ export function AnagramSolver() {
               </Card>
             ))}
           </SimpleGrid>
+          {debug && (
+            <Box mt={4} p={4} bg="gray.100" borderRadius="md">
+              <Text fontSize="sm" fontFamily="monospace" whiteSpace="pre-wrap">
+                Raw Text:
+                - Original: {debug.raw.original}
+                - Is UTF-8: {debug.raw.is_utf8 ? 'Yes' : 'No'}
+                - Length: {debug.raw.length}
+                - Bytes: {debug.raw.bytes}
+                
+                Decoded Text:
+                - Original: {debug.decoded.original}
+                - Is UTF-8: {debug.decoded.is_utf8 ? 'Yes' : 'No'}
+                - Length: {debug.decoded.length}
+                - Bytes: {debug.decoded.bytes}
+                
+                {debug.error && (
+                  <Box color="red.500" mt={2}>
+                    Error: {debug.error}
+                  </Box>
+                )}
+              </Text>
+            </Box>
+          )}
         </VStack>
       </VStack>
     </Container>
