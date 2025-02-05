@@ -1,0 +1,54 @@
+### Perl ###
+!Build/
+.last_cover_stats
+/META.yml
+/META.json
+/MYMETA.*
+*.o
+*.pm.tdy
+*.bs
+*.old
+*~
+*.swp
+*.bak
+
+# Perl module build artifacts
+/blib/
+/pm_to_blib
+/Makefile
+/Makefile.old
+/MANIFEST.bak
+/MANIFEST.SKIP.bak
+/_build/
+/Build
+/Build.bat
+/cover_db/
+
+# Devel::Cover
+/cover_db/
+
+# Devel::NYTProf
+/nytprof.out
+/nytprof/
+
+# Dizt::Zilla
+/.build/
+
+# Module::Build
+_build/
+Build
+Build.bat
+
+# Module::Install
+inc/
+
+# ExtUtils::MakeMaker
+/blib/
+/pm_to_blib
+/Makefile
+/Makefile.old
+
+# Local configuration files
+.env
+*.local
+config.local.pl

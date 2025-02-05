@@ -1,0 +1,214 @@
+Project Documentation: AnagramGPT
+Overview:
+AnagramGPT is a command‑line anagram solver application built in Perl. Its primary goal is to solve multi‑word anagrams using a Hebrew dictionary. The application supports normalization of Hebrew letters—particularly mapping final (soﬁt) forms to their standard equivalents—and uses a recursive backtracking algorithm to identify valid combinations of words that exactly match all the input letters. The project is organized in a modular way to facilitate future enhancements (including a potential web interface) and to allow for comprehensive testing.
+
+1. Directory Structure
+The project resides in the anagramGpt folder with the following structure:
+
+graphql
+Copy
+anagramGpt/
+├── README.md            # Project overview and usage instructions.
+├── bin/                 # Contains command‑line scripts.
+│   └── anagram_solver.pl  # Main CLI entry point for the anagram solver.
+├── data/                # Data files.
+│   └── hebrew_dict.txt  # The Hebrew dictionary file containing valid words.
+├── docs/                # Documentation files (additional, if needed).
+├── lib/
+│   └── Anagram/         # Perl modules for business logic.
+│       ├── Dictionary.pm  # Module for dictionary loading and normalization.
+│       └── Solver.pm      # Module implementing the anagram-finding recursive algorithm.
+└── t/                   # Test suite directory.
+    ├── 00-dictionary.t  # Tests for the Dictionary module (loading and normalization).
+    ├── 01-solver.t      # Tests for the Solver module with a small mock dictionary.
+    └── 02-real.t        # Integration test using the real dictionary file to test input (e.g. “תשאל”).
+Additionally, a setup folder exists (e.g., /Users/shaik/projects/anagramGpt/setup) containing bootstrap scripts (such as setup_project.pl) to generate the project scaffold. These setup files are used for quickly creating or updating the directory structure and placeholder files.
+
+2. Module Descriptions
+2.1. lib/Anagram/Dictionary.pm
+Purpose:
+
+Load the Hebrew dictionary from a file.
+Provide a normalization function to convert Hebrew final-letter forms (אותיות סופיות) into their base forms.
+Key Functions:
+
+new(%args)
+Creates a new Dictionary object. The constructor accepts an optional dict_file parameter; if not provided, a default relative path (data/hebrew_dict.txt) is used.
+It then calls the private method _load_dictionary.
+
+_load_dictionary
+Opens the dictionary file (using UTF‑8 encoding), skips comment lines (lines starting with #), and loads each word (with chomp removal) into an internal array. The words are stored as plain strings in a scalar (returned later as an array reference).
+
+get_words
+Returns the array reference of dictionary words.
+
+normalize_word($word)
+A function that takes a Hebrew word and replaces final forms with their base letters using a hard-coded mapping:
+
+ך → כ
+ם → מ
+ן → נ
+ף → פ
+ץ → צ
+This normalization is applied both to dictionary words and to user input before processing.
+
+Encoding Considerations:
+All file I/O is performed in UTF‑8 mode (<:encoding(UTF-8)), and the module expects that the dictionary file is saved in UTF‑8 without BOM.
+
+2.2. lib/Anagram/Solver.pm
+Purpose:
+
+Implement the core logic for finding anagrams that use all letters of the input.
+Preprocess dictionary words to build frequency maps (i.e., counts of each character in the normalized word).
+Use a recursive backtracking algorithm to explore valid combinations of dictionary words that together match the frequency map of the normalized input.
+Key Functions and Concepts:
+
+new(%args)
+Constructs a Solver object. Accepts parameters including:
+
+dict: A Dictionary object (default is to create one using default parameters).
+ignore_one_letter: A flag (default true) to skip one‑letter words.
+max_words: Maximum number of words allowed in an anagram solution (default 3).
+debug: A flag for debug logging.
+It calls _prepare_dictionary after object creation.
+
+_prepare_dictionary
+Iterates over words returned by the dictionary, applies normalization, skips one‑letter words (if enabled), computes a frequency map for each word (using _compute_frequency), and stores each entry as a hash reference containing the original word, normalized word, and frequency map. The dictionary entries are sorted by the normalized form to help avoid duplicate combinations in the recursive search.
+
+_compute_frequency($word)
+Computes and returns a hash reference representing the frequency of each character in the given normalized word.
+
+_is_subset($sub, $super)
+A helper that returns true if the frequency map in $sub is a subset of $super. Used to determine if a candidate word’s letters can be subtracted from the current remaining letter set.
+
+_subtract_freq($super, $sub)
+Returns a new frequency map by subtracting the counts of $sub from $super. If a count drops to zero or below, that character is removed.
+
+_freq_to_string($freq)
+A helper function for formatting frequency maps into a readable string for debugging.
+
+_search($remaining, $start_index, $current, $results)
+The core recursive function that performs backtracking:
+
+If no letters remain ($remaining is empty), it pushes the current combination (a list of original words) onto $results.
+Otherwise, it iterates over the dictionary entries (starting from $start_index to avoid duplicate ordering) and, if an entry’s frequency is a subset of $remaining, subtracts it, appends the word to the current combination, and recurses.
+Debug logging (if enabled) outputs the current state (remaining letters, candidate word, new remaining frequency) for step-by-step tracing.
+find_anagrams($input)
+Public method that accepts an input string, normalizes it, computes its frequency map, and then calls _search to collect valid anagram combinations. Returns an array reference where each element is an array reference containing one valid combination of words.
+
+Debug Logging:
+When the debug flag is enabled (via a -d command‑line option), the module prints detailed messages about the normalized input, frequency maps, candidate words being tried, and recursive search steps. This is crucial for diagnosing issues such as encoding mismatches or unexpected frequency maps.
+
+3. Command‑Line Interface: bin/anagram_solver.pl
+Purpose:
+
+Serve as the entry point for the anagram solver when run from the command line.
+Decode command‑line arguments from UTF‑8 into Perl’s internal Unicode representation (using the Encode module) to ensure proper handling of Hebrew input.
+Instantiate a Solver object (passing the debug flag if needed) and print the results.
+Key Points in the Script:
+
+Uses:
+
+perl
+Copy
+use open qw(:std :utf8);
+to set STDIN, STDOUT, and STDERR to UTF‑8 mode.
+
+Explicitly decodes @ARGV:
+
+perl
+Copy
+@ARGV = map { Encode::decode("UTF-8", $_) } @ARGV;
+so that the input (e.g., "תשאל") is correctly interpreted.
+
+Accepts a -d (or --debug) flag to activate debug logging in the Solver.
+
+Outputs either the found anagram combinations (as space-separated words) or a message indicating that no anagrams were found.
+
+4. Testing
+The project includes a robust test suite using Perl’s Test::More framework. Tests are located in the t/ directory:
+
+4.1. t/00-dictionary.t
+Purpose:
+To verify that the Dictionary module loads a temporary dictionary file correctly and that the normalization function works as expected.
+
+Key Checks:
+
+The loaded words match the expected list (e.g., ["של", "את"]).
+The normalization of a string containing final forms (e.g., "ךםןףץ") yields the expected result ("כמנפצ").
+UTF‑8 Handling:
+The test uses use open qw(:std :utf8); to ensure that Unicode characters print correctly without “wide character” warnings.
+
+4.2. t/01-solver.t
+Purpose:
+To test the Solver module using a small, controlled mock dictionary.
+
+Key Checks:
+
+For an input like "אתשל", the solver returns at least one valid combination.
+The expected combination (for example, ["את", "של"], compared in sorted order) is present.
+An input that cannot be decomposed (e.g., "אבג") yields no results.
+4.3. t/02-real.t
+Purpose:
+To run an integration test using the real dictionary file (data/hebrew_dict.txt) and verify that for a given Hebrew input (e.g., "תשאל"), the solver returns the expected anagram combination.
+
+Notes:
+This test is sensitive to the contents and formatting of the real dictionary file. It verifies that:
+
+The dictionary file is correctly loaded.
+The normalization and frequency mapping work consistently.
+The recursive algorithm finds the correct combination (e.g., a combination equivalent to ["את", "של"] when sorted).
+5. Encoding and Internationalization
+Given that the application is for Hebrew text, proper handling of Unicode is critical. The project uses the following practices:
+
+All source files, dictionary files, and test files are saved in UTF‑8 without a BOM.
+The Perl modules and scripts use use utf8; to interpret literal strings as UTF‑8.
+File I/O explicitly uses <:encoding(UTF-8) or >:encoding(UTF-8) layers.
+The command‑line script decodes @ARGV with Encode::decode("UTF-8", $_) to handle Hebrew characters correctly.
+Terminal locales should be set to a UTF‑8–compatible locale (e.g., en_US.UTF-8).
+6. Algorithm Summary
+The solver uses the following approach:
+
+Normalization:
+Both the input string and each dictionary word are normalized by replacing final forms with their base equivalents.
+
+Frequency Map Creation:
+Each normalized word is converted into a frequency map—a hash where keys are characters and values are counts. The input string is similarly processed.
+
+Recursive Backtracking:
+A recursive function (_search) explores the dictionary words (sorted by normalized form) to find combinations such that the union of their frequency maps exactly matches the input’s frequency map.
+
+It uses subset checking (_is_subset) to decide if a candidate word can be subtracted from the remaining letters.
+It uses frequency subtraction (_subtract_freq) to update the remaining letters.
+If the remaining frequency map is empty, a valid solution is found.
+The recursion is limited by the max_words parameter to avoid overly deep searches.
+Debug Logging:
+When enabled, detailed debug messages are printed, showing the input’s normalized form, frequency maps, candidate choices, and backtracking steps.
+
+7. Future Work and Extensibility
+The current project serves as a solid base for further development. Possible enhancements include:
+
+Expanding the Dictionary:
+Enrich the dictionary file with more Hebrew words and phrases to increase solution diversity.
+
+Optimizing the Recursive Algorithm:
+Implement caching or memoization to improve performance on larger dictionaries or longer inputs.
+
+Web Interface:
+Separate the business logic (already encapsulated in modules) from the presentation layer to create a web-based interface using a Perl web framework (e.g., Mojolicious or Dancer).
+
+Advanced Normalization:
+Handle additional Unicode normalization issues (e.g., combining diacritical marks) to ensure consistent treatment of visually similar characters.
+
+Enhanced Testing:
+Write additional tests to cover edge cases, performance benchmarks, and integration with a potential web front end.
+
+8. Conclusion
+This document provides a complete overview of the AnagramGPT project. It covers:
+
+The overall purpose and design.
+The file and directory structure.
+Detailed explanations of each module and its functionality.
+Testing strategies and encoding practices.
+The recursive algorithm for solving multi‑word anagrams in Hebrew.
+Future directions for development.
